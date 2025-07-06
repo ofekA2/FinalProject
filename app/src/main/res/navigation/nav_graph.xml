@@ -3,12 +3,41 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/homeFragment">
+    app:startDestination="@id/loginFragment">
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.finalproject.LoginFragment"
+        android:label="Login">
+        <action
+            android:id="@+id/action_login_to_register"
+            app:destination="@id/registerFragment" />
+        <action
+            android:id="@+id/action_login_to_home"
+            app:destination="@id/homeFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/registerFragment"
+        android:name="com.example.finalproject.RegisterFragment"
+        android:label="Register">
+        <action
+            android:id="@+id/action_register_to_home"
+            app:destination="@id/homeFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/homeFragment"
         android:name="com.example.finalproject.HomeFragment"
-        android:label="Home">
+        android:label="Reviewaurant">
+        <action
+            android:id="@+id/action_home_to_list"
+            app:destination="@id/restaurantListFragment"/>
     </fragment>
+
+    <fragment
+        android:id="@+id/restaurantListFragment"
+        android:name="com.example.finalproject.RestaurantListFragment"
+        android:label="Restaurants" />
 
 </navigation>
