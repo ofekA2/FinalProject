@@ -13,7 +13,7 @@
         style="@style/TextAppearance.Reviewaurant.Headline"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Welcome back!"
+        android:text="Welcome!"
         android:layout_gravity="center_horizontal"/>
 
     <com.google.android.material.textfield.TextInputLayout

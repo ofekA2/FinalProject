@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.example.finalproject.databinding.FragmentLoginBinding
 import com.google.firebase.auth.FirebaseAuth
+import android.util.Log
 
 class LoginFragment : Fragment() {
 
@@ -44,8 +45,10 @@ class LoginFragment : Fragment() {
                     .addOnSuccessListener {
                         findNavController().navigate(R.id.action_login_to_home)
                     }
-                    .addOnFailureListener {
-                        toast("Login failed: ${it.message}")
+                    .addOnFailureListener { ex ->
+                        Toast.makeText(requireContext(),
+                            "Login failed: ${ex.message}", Toast.LENGTH_LONG).show()
+                        Log.e("LoginFragment", "Login error", ex)
                     }
             }
         }
