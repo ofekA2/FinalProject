@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
         val navController = navHost.navController
         val graph = navController.navInflater.inflate(R.navigation.nav_graph)
         if (FirebaseAuth.getInstance().currentUser != null)
-                graph.setStartDestination(R.id.homeFragment)
+                graph.setStartDestination(R.id.restaurantListFragment)
         else
                 graph.setStartDestination(R.id.loginFragment)
 
