@@ -11,5 +11,7 @@ data class Review(
     val reviewText: String = "",
     val imageUrl: String = "",
     val authorId: String = "",
+    val authorName: String = "",
+    val authorPhoto: String = "",
     val timestamp: Timestamp? = null
 )

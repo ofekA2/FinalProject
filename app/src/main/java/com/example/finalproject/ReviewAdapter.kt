@@ -29,6 +29,17 @@ class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<Revi
             else {
                 binding.ivPhoto.setImageDrawable(null)
             }
+
+            if (item.authorPhoto.isNotBlank()) {
+                Glide.with(binding.ivAuthorPhoto.context).load(item.authorPhoto).circleCrop().into(binding.ivAuthorPhoto)
+            }
+            else {
+                binding.ivAuthorPhoto.setImageResource(R.drawable.ic_profile)
+            }
+
+            binding.tvAuthorName.text = item.authorName
+
+
         }
     }
 
