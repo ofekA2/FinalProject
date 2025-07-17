@@ -12,6 +12,7 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.google.firebase.auth.FirebaseAuth
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,8 +33,22 @@ class MainActivity : AppCompatActivity() {
 
         navController.setGraph(graph, intent.extras)
         setupActionBarWithNavController(navController)
-        findViewById<BottomNavigationView>(R.id.bottom_nav)
-            .setupWithNavController(navController)
+        findViewById<BottomNavigationView>(R.id.bottom_nav).setupWithNavController(navController)
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            when (destination.id) {
+                R.id.loginFragment,
+                R.id.registerFragment -> {
+                    bottomNav.visibility = View.GONE
+                    supportActionBar?.hide()
+                }
+                else -> {
+                    bottomNav.visibility = View.VISIBLE
+                    supportActionBar?.show()
+                }
+            }
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(sys.left, sys.top, sys.right, sys.bottom)
