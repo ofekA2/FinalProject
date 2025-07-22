@@ -7,6 +7,7 @@ import com.bumptech.glide.Glide
 import com.example.finalproject.databinding.ItemReviewBinding
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.roundToInt
 
 class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<ReviewAdapter.VH>() {
 
@@ -14,7 +15,8 @@ class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<Revi
         fun bind(item: Review) {
             binding.tvRestaurant.text = item.restaurant
             binding.tvDetails.text = "${item.city} • ${item.cuisine}"
-            binding.tvRating.text = "⭐ ${item.rating} / 10"
+            val r = ((item.rating?:0.0)*10).roundToInt()/10.0
+            binding.tvRating.text = "⭐ %.1f/10".format(r)
             binding.tvPriceTier.text = "$".repeat(item.priceTier)
             binding.tvReviewText.text = item.reviewText
 
