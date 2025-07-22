@@ -1,15 +1,20 @@
 package com.example.finalproject
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.finalproject.databinding.ItemReviewBinding
+import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
+
 class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<ReviewAdapter.VH>() {
+
+    var onMenuClick: ((review:Review, anchor:View) -> Unit)? = null
 
     inner class VH(val binding: ItemReviewBinding): RecyclerView.ViewHolder(binding.root) {
         fun bind(item: Review) {
@@ -41,7 +46,13 @@ class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<Revi
 
             binding.tvAuthorName.text = item.authorName
 
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+            binding.btnMore.visibility =
+                if (item.authorId == currentUid) View.VISIBLE else View.GONE
 
+            binding.btnMore.setOnClickListener {
+                onMenuClick?.invoke(item, binding.btnMore)
+            }
         }
     }
 
@@ -52,13 +63,9 @@ class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<Revi
 
     override fun getItemCount(): Int = items.size
 
-    var onLongClick:((Review) -> Unit)? = null
     override fun onBindViewHolder(holder: VH, position: Int) {
         holder.bind(items[position])
-        holder.itemView.setOnLongClickListener{
-            onLongClick?.invoke(items[position])
-            true
-        }
+        holder.binding.btnMore.setOnClickListener { onMenuClick?.invoke(items[position], holder.binding.btnMore) }
     }
 
     fun setData(newItems: List<Review>) {
