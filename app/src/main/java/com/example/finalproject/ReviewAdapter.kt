@@ -52,8 +52,13 @@ class ReviewAdapter(private var items: List<Review>) : RecyclerView.Adapter<Revi
 
     override fun getItemCount(): Int = items.size
 
+    var onLongClick:((Review) -> Unit)? = null
     override fun onBindViewHolder(holder: VH, position: Int) {
         holder.bind(items[position])
+        holder.itemView.setOnLongClickListener{
+            onLongClick?.invoke(items[position])
+            true
+        }
     }
 
     fun setData(newItems: List<Review>) {

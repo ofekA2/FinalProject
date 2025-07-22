@@ -8,36 +8,46 @@
     android:gravity="center_horizontal"
     android:padding="24dp">
 
-    <ImageView
-        android:id="@+id/ivProfilePic"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:src="@drawable/ic_profile"
-        android:scaleType="centerCrop"
-        android:contentDescription="Profile picture"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:id="@+id/tvProfileName"
-        style="@style/TextAppearance.Reviewaurant.Headline"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Your Name"
-        android:layout_marginBottom="8dp" />
-
-    <TextView
-        android:id="@+id/tvProfileEmail"
-        style="@style/TextAppearance.Reviewaurant.Body"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="email@example.com"
-        android:layout_marginBottom="24dp" />
-
-    <com.google.android.material.button.MaterialButton
-        style="@style/Widget.Reviewaurant.Button"
-        android:id="@+id/btnLogout"
+    <LinearLayout
+        android:id="@+id/profileHeader"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Log Out" />
+        android:layout_height="187dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/ivProfilePic"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="Profile picture"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_profile" />
+
+        <TextView
+            android:id="@+id/tvProfileName"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="User Name"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLogout"
+            style="@style/Widget.Reviewaurant.Button"
+            android:layout_width="153dp"
+            android:layout_height="wrap_content"
+            android:text="Log Out" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvMyPosts"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp" />
 
 </LinearLayout>

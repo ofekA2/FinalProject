@@ -10,6 +10,10 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+
+    plugins{
+        id("androidx.navigation.safeargs.kotlin")
+    }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)

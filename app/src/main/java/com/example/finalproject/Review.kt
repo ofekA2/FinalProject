@@ -3,6 +3,7 @@ package com.example.finalproject
 import  com.google.firebase.Timestamp
 
 data class Review(
+    val id: String = "",
     val restaurant: String = "",
     val city: String = "",
     val cuisine: String = "",
