@@ -10,12 +10,12 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
-import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
+import com.example.finalproject.data.AppDatabase
 import com.example.finalproject.databinding.FragmentProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
@@ -25,6 +25,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.launch
 
 class ProfileFragment : Fragment() {
 
@@ -83,6 +84,11 @@ class ProfileFragment : Fragment() {
         binding.rvMyPosts.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMyPosts.adapter = myPostsAdapter
 
+        binding.fabAddPost.setOnClickListener {
+            val action = ProfileFragmentDirections.actionProfileFragmentToNewPostFragment(null)
+            findNavController().navigate(action)
+        }
+
         myPostsAdapter.onMenuClick = { review, anchor -> showPopupMenu(anchor, review) }
 
         loadMyPosts(user.uid)
@@ -126,32 +132,34 @@ class ProfileFragment : Fragment() {
     }
 
     private fun openEditScreen(reviewId: String) {
-        try {
-            val action = ProfileFragmentDirections
-                .actionProfileFragmentToNewPostFragment(reviewId)
-            findNavController().navigate(action)
-        } catch (_: Exception) {
-            val b = bundleOf("reviewId" to reviewId)
-            findNavController().navigate(R.id.newPostFragment, b)
-        }
+        val action = ProfileFragmentDirections.actionProfileFragmentToNewPostFragment(reviewId)
+        findNavController().navigate(action)
     }
 
     private fun confirmDelete(id: String, imageUrl: String?) {
-        MaterialAlertDialogBuilder(requireContext()).setMessage("Delete this review?").setPositiveButton("Delete"){
-            _,_ ->  db.collection("reviews").document(id).delete().addOnSuccessListener {
-                if (!imageUrl.isNullOrBlank()) {
-                    FirebaseStorage.getInstance()
-                        .getReferenceFromUrl(imageUrl)
-                        .delete()
-                }
-                Toast.makeText(context, "Deleted", Toast.LENGTH_SHORT).show()
+        MaterialAlertDialogBuilder(requireContext())
+            .setMessage("Delete this review?")
+            .setPositiveButton("Delete") { _, _ ->
+                FirebaseFirestore.getInstance()
+                    .collection("reviews")
+                    .document(id)
+                    .delete()
+                    .addOnSuccessListener {
+                        // then delete local Room copy
+                        lifecycleScope.launch {
+                            MyApp.database.reviewDao().deleteById(id)
+                        }
+                        imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                            FirebaseStorage.getInstance().getReferenceFromUrl(url).delete()
+                        }
+                        Toast.makeText(context, "Deleted", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(context, it.message, Toast.LENGTH_SHORT).show()
+                    }
             }
-            .addOnFailureListener {
-                Toast.makeText(context, it.message, Toast.LENGTH_SHORT).show()
-            }
-        }
-
-            .setNegativeButton("Cancel", null).show()
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showEditDialog() {
@@ -159,10 +167,10 @@ class ProfileFragment : Fragment() {
             .inflate(R.layout.dialog_edit_profile, null)
 
         val ivPreview = v.findViewById<ImageView>(R.id.ivPreview)
-        val btnPick   = v.findViewById<Button>(R.id.btnPick)
-        val etName    = v.findViewById<TextInputEditText>(R.id.etName)
+        val btnPick = v.findViewById<Button>(R.id.btnPick)
+        val etName = v.findViewById<TextInputEditText>(R.id.etName)
         val btnCancel = v.findViewById<Button>(R.id.btnCancel)
-        val btnSave   = v.findViewById<Button>(R.id.btnSave)
+        val btnSave = v.findViewById<Button>(R.id.btnSave)
 
         val user = auth.currentUser!!
         etName.setText(user.displayName ?: "")

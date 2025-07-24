@@ -5,31 +5,48 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.finalproject.databinding.FragmentRestaurantListBinding
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+
 
 class RestaurantListFragment: Fragment() {
     private var _binding: FragmentRestaurantListBinding? = null
     private val binding get() = _binding!!
 
-    private lateinit var db: FirebaseFirestore
-    private lateinit var adapter: ReviewAdapter
+    private val viewModel: HomeViewModel by viewModels()
+    private val adapter = ReviewAdapter(emptyList())
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentRestaurantListBinding.inflate(inflater, container, false)
-        db = FirebaseFirestore.getInstance()
-        adapter = ReviewAdapter(emptyList())
-        binding.rvRestaurants.layoutManager = LinearLayoutManager(context)
-        binding.rvRestaurants.adapter = adapter
-        db.collection("reviews").orderBy("timestamp", Query.Direction.DESCENDING).addSnapshotListener{ snapshot, e ->
-            val list = snapshot?.documents?.map { doc ->
-                doc.toObject(Review::class.java)!!.copy(id=doc.id)
-            }?: emptyList()
-            adapter.setData(list)
+         return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        binding.recyclerView.apply{
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = this@RestaurantListFragment.adapter
+        }
+
+        viewModel.reviews.observe(viewLifecycleOwner){ entities -> val uiReviews = entities.map { ent ->
+                Review(
+                    id = ent.id,
+                    authorId = ent.authorId,
+                    authorName = ent.authorName,
+                    authorPhoto = ent.authorPhoto,
+                    restaurant = ent.restaurant,
+                    city = ent.city,
+                    cuisine = ent.cuisine,
+                    rating = ent.rating,
+                    priceTier = ent.priceTier,
+                    reviewText = ent.reviewText,
+                    imageUrl = ent.imageUrl,
+                    timestamp = com.google.firebase.Timestamp(ent.timestampMs/1000,((ent.timestampMs%1000)*1_000_000).toInt())
+                )
             }
-        return binding.root
+            adapter.setData(uiReviews)
+        }
     }
 
     override fun onDestroyView() {

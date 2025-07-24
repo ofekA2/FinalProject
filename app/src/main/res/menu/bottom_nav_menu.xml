@@ -12,11 +12,6 @@
         android:title="Search"/>
 
     <item
-        android:id="@+id/newPostFragment"
-        android:icon="@drawable/ic_add"
-        android:title="New"/>
-
-    <item
         android:id="@+id/profileFragment"
         android:icon="@drawable/ic_profile"
         android:title="Profile"/>

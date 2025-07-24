@@ -37,24 +37,22 @@
         android:label="Search"/>
 
     <fragment
-        android:id="@+id/newPostFragment"
-        android:name="com.example.finalproject.NewPostFragment"
-        android:label="New Post">
-        <argument
-            android:name="reviewId"
-            app:argType="string"
-            android:defaultValue="" />
-    </fragment>
-
-
-    <fragment
         android:id="@+id/profileFragment"
         android:name="com.example.finalproject.ProfileFragment"
         android:label="Profile">
         <action
             android:id="@+id/action_profileFragment_to_newPostFragment"
             app:destination="@id/newPostFragment" />
+    </fragment>
 
+    <fragment
+        android:id="@+id/newPostFragment"
+        android:name="com.example.finalproject.NewPostFragment"
+        android:label="My post">
+        <argument
+            android:name="reviewId"
+            app:argType="string"
+            app:nullable="true" />
     </fragment>
 
 </navigation>

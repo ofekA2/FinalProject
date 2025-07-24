@@ -25,7 +25,7 @@ class NewPostFragment : Fragment() {
 
     private val args: NewPostFragmentArgs by navArgs()
     private val auth by lazy { FirebaseAuth.getInstance() }
-    private val db   by lazy { FirebaseFirestore.getInstance() }
+    private val db by lazy { FirebaseFirestore.getInstance() }
 
     private var pickedImageUri: Uri? = null
     private var existingImageUrl: String? = null

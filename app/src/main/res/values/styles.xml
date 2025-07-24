@@ -3,7 +3,6 @@
     <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/pink</item>
         <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorSecondary">@color/teal_200</item>
     </style>
 
     <style name="Widget.Reviewaurant.Button" parent="Widget.MaterialComponents.Button">
