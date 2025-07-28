@@ -1,5 +1,6 @@
 package com.example.finalproject.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -16,5 +17,6 @@ data class ReviewEntity(
     val priceTier: Int,
     val reviewText: String,
     val imageUrl: String,
-    val timestampMs: Long
+    @ColumnInfo(name = "timestampMs")
+    val timestampMs: Long = System.currentTimeMillis()
 )

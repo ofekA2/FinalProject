@@ -24,13 +24,14 @@ class NewPostFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val args: NewPostFragmentArgs by navArgs()
-    private val auth by lazy { FirebaseAuth.getInstance() }
-    private val db by lazy { FirebaseFirestore.getInstance() }
-
-    private var pickedImageUri: Uri? = null
-    private var existingImageUrl: String? = null
     private var editingId: String? = null
     private var isEditMode = false
+    private var existingImageUrl: String? = null
+
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    private val db   by lazy { FirebaseFirestore.getInstance() }
+
+    private var pickedImageUri: Uri? = null
 
     private val pickImageLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -39,17 +40,15 @@ class NewPostFragment : Fragment() {
         }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentNewPostBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ) = FragmentNewPostBinding.inflate(inflater, container, false)
+        .also { _binding = it }
+        .root
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        editingId = args.reviewId
+        editingId  = args.reviewId
         isEditMode = editingId != null
 
         if (isEditMode) {
@@ -64,31 +63,49 @@ class NewPostFragment : Fragment() {
         binding.btnSubmitPost.setOnClickListener {
             if (!validateFields()) return@setOnClickListener
 
-            val user = auth.currentUser ?: return@setOnClickListener
+            val user       = auth.currentUser ?: return@setOnClickListener
             val restaurant = binding.etRestaurant.text.toString().trim()
-            val city = binding.etCity.text.toString().trim()
-            val cuisine = binding.etCuisine.text.toString().trim()
-            val rating = binding.sliderRating.value.toDouble()
-            val priceTier = binding.sliderPrice.value.toInt()
+            val city       = binding.etCity    .text.toString().trim()
+            val cuisine    = binding.etCuisine .text.toString().trim()
+            val rating     = binding.sliderRating.value.toDouble()
+            val priceTier  = binding.sliderPrice .value.toInt()
             val reviewText = binding.etReviewText.text.toString().trim()
 
             binding.btnSubmitPost.isEnabled = false
 
+            fun doUpdate(imageUrl: String?) {
+                val data = mapOf(
+                    "restaurant" to restaurant,
+                    "city"       to city,
+                    "cuisine"    to cuisine,
+                    "rating"     to rating,
+                    "priceTier"  to priceTier,
+                    "reviewText" to reviewText,
+                    "imageUrl"   to (imageUrl ?: ""),
+                    "timestamp"  to Timestamp.now()
+                )
+                db.collection("reviews")
+                    .document(editingId!!)
+                    .set(data, SetOptions.merge())
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Updated!", Toast.LENGTH_SHORT).show()
+                        findNavController().popBackStack()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(requireContext(), it.message, Toast.LENGTH_SHORT).show()
+                        binding.btnSubmitPost.isEnabled = true
+                    }
+            }
+
             if (pickedImageUri != null) {
                 uploadImage(user.uid, pickedImageUri!!) { url ->
-                    if (isEditMode) {
-                        updateReview(url ?: existingImageUrl, restaurant, city, cuisine, rating, priceTier, reviewText)
-                    } else {
-                        saveReview(url, user, restaurant, city, cuisine, rating, priceTier, reviewText)
-                    }
+                    doUpdate(url ?: existingImageUrl)
                 }
+            } else if (isEditMode) {
+                doUpdate(existingImageUrl)
             } else {
-                if (isEditMode) {
-                    updateReview(existingImageUrl, restaurant, city, cuisine, rating, priceTier, reviewText)
-                } else {
-                    Toast.makeText(requireContext(), "Image is required", Toast.LENGTH_SHORT).show()
-                    binding.btnSubmitPost.isEnabled = true
-                }
+                Toast.makeText(requireContext(), "Image is required", Toast.LENGTH_SHORT).show()
+                binding.btnSubmitPost.isEnabled = true
             }
         }
     }
@@ -99,10 +116,10 @@ class NewPostFragment : Fragment() {
                 val r = snap.toObject(Review::class.java) ?: return@addOnSuccessListener
                 existingImageUrl = r.imageUrl
                 binding.etRestaurant.setText(r.restaurant)
-                binding.etCity.setText(r.city)
-                binding.etCuisine.setText(r.cuisine)
+                binding.etCity     .setText(r.city)
+                binding.etCuisine  .setText(r.cuisine)
                 binding.sliderRating.value = r.rating.toFloat()
-                binding.sliderPrice.value  = r.priceTier.toFloat()
+                binding.sliderPrice .value = r.priceTier.toFloat()
                 binding.etReviewText.setText(r.reviewText)
             }
             .addOnFailureListener {
@@ -112,16 +129,37 @@ class NewPostFragment : Fragment() {
 
     private fun validateFields(): Boolean {
         var ok = true
-        if (binding.etRestaurant.text.toString().isBlank()) { binding.etRestaurant.error = "Required"; ok = false }
-        if (binding.etCity.text.toString().isBlank())       { binding.etCity.error = "Required"; ok = false }
-        if (binding.etCuisine.text.toString().isBlank())    { binding.etCuisine.error = "Required"; ok = false }
-        if (binding.etReviewText.text.toString().isBlank()) { binding.etReviewText.error = "Required"; ok = false }
+
+        val restaurant = binding.etRestaurant.text.toString().trim()
+        if (restaurant.isBlank()) {
+            binding.etRestaurant.error = "Required"
+            ok = false
+        }
+
+        val city = binding.etCity.text.toString().trim()
+        if (city.isBlank()) {
+            binding.etCity.error = "Required"
+            ok = false
+        }
+
+        val cuisine = binding.etCuisine.text.toString().trim()
+        if (cuisine.isBlank()) {
+            binding.etCuisine.error = "Required"
+            ok = false
+        }
+
+        val reviewText = binding.etReviewText.text.toString().trim()
+        if (reviewText.isBlank()) {
+            binding.etReviewText.error = "Required"
+            ok = false
+        }
+
         return ok
     }
 
     private fun uploadImage(uid: String, uri: Uri, onDone: (String?) -> Unit) {
-        val ref = FirebaseStorage.getInstance().reference
-            .child("review_photos/${uid}_${UUID.randomUUID()}.jpg")
+        val ref = FirebaseStorage.getInstance()
+            .reference.child("review_photos/${uid}_${UUID.randomUUID()}.jpg")
 
         ref.putFile(uri)
             .continueWithTask { task ->
@@ -132,72 +170,6 @@ class NewPostFragment : Fragment() {
             .addOnFailureListener {
                 Toast.makeText(requireContext(), "Image upload failed", Toast.LENGTH_SHORT).show()
                 onDone(null)
-            }
-    }
-
-    private fun saveReview(
-        imageUrl: String?,
-        user: com.google.firebase.auth.FirebaseUser,
-        restaurant: String,
-        city: String,
-        cuisine: String,
-        rating: Double,
-        priceTier: Int,
-        reviewText: String
-    ) {
-        val review = hashMapOf(
-            "restaurant" to restaurant,
-            "city" to city,
-            "cuisine" to cuisine,
-            "rating" to rating,
-            "priceTier" to priceTier,
-            "reviewText" to reviewText,
-            "imageUrl" to (imageUrl ?: ""),
-            "timestamp" to Timestamp.now(),
-            "authorId" to user.uid,
-            "authorName" to (user.displayName ?: "Anonymous"),
-            "authorPhoto" to (user.photoUrl?.toString().orEmpty())
-        )
-
-        db.collection("reviews").add(review)
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Posted!", Toast.LENGTH_SHORT).show()
-                findNavController().popBackStack()
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), it.message, Toast.LENGTH_SHORT).show()
-                binding.btnSubmitPost.isEnabled = true
-            }
-    }
-
-    private fun updateReview(
-        imageUrl: String?,
-        restaurant: String,
-        city: String,
-        cuisine: String,
-        rating: Double,
-        priceTier: Int,
-        reviewText: String
-    ) {
-        val map = mapOf(
-            "restaurant" to restaurant,
-            "city" to city,
-            "cuisine" to cuisine,
-            "rating" to rating,
-            "priceTier" to priceTier,
-            "reviewText" to reviewText,
-            "imageUrl" to (imageUrl ?: "")
-        )
-
-        db.collection("reviews").document(editingId!!)
-            .set(map, SetOptions.merge())
-            .addOnSuccessListener {
-                Toast.makeText(requireContext(), "Updated!", Toast.LENGTH_SHORT).show()
-                findNavController().popBackStack()
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), it.message, Toast.LENGTH_SHORT).show()
-                binding.btnSubmitPost.isEnabled = true
             }
     }
 

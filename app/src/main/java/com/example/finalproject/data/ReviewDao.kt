@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/finalproject/data/ReviewDao.kt
 package com.example.finalproject.data
 
 import androidx.room.Dao
@@ -16,8 +17,8 @@ interface ReviewDao {
     fun getByUser(uid: String): Flow<List<ReviewEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(reviews: List<ReviewEntity>)
+    fun upsert(reviews: List<ReviewEntity>): List<Long>
 
     @Query("DELETE FROM reviews WHERE id = :id")
-    suspend fun deleteById(id: String): Int
+    fun deleteById(id: String): Int
 }

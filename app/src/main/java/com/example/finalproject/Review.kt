@@ -7,7 +7,7 @@ data class Review(
     val restaurant: String = "",
     val city: String = "",
     val cuisine: String = "",
-    val priceTier: Int = 0,
+    val priceTier: Int = 1,
     val rating: Double = 0.0,
     val reviewText: String = "",
     val imageUrl: String = "",

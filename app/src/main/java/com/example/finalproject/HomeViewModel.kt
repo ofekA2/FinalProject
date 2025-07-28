@@ -1,45 +1,51 @@
 package com.example.finalproject
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import com.example.finalproject.data.ReviewDao
 import com.example.finalproject.data.ReviewEntity
+import com.example.finalproject.data.ReviewDao
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val dao: ReviewDao = MyApp.database.reviewDao()
     private val firestore = FirebaseFirestore.getInstance()
 
-    val reviews: LiveData<List<ReviewEntity>> = dao.getAll().asLiveData()
+    val reviews = dao.getAll().asLiveData()
 
     init {
-        firestore.collection("reviews")
-            .addSnapshotListener { snap, err ->
-                if (err != null || snap == null) return@addSnapshotListener
-                val entities = snap.documents.mapNotNull { doc ->
-                    val data = doc.data?: return@mapNotNull null
-                    val ts = (data["timestamp"] as? com.google.firebase.Timestamp) ?: return@mapNotNull null
-                    ReviewEntity(
-                        id = doc.id,
-                        authorId = data["authorId"] as String,
-                        authorName = data["authorName"] as String,
-                        authorPhoto = data["authorPhoto"] as String,
-                        restaurant = data["restaurant"] as String,
-                        city = data["city"] as String,
-                        cuisine = data["cuisine"] as String,
-                        rating = (data["rating"] as Number).toDouble(),
-                        priceTier = (data["priceTier"] as Number).toInt(),
-                        reviewText = data["reviewText"] as String,
-                        imageUrl = data["imageUrl"] as String,
-                        timestampMs= ts.toDate().time
-                    )
-                }
-                viewModelScope.launch {
-                    dao.upsert(entities)
-                }
+        refreshFromRemote()
+    }
+
+    private fun refreshFromRemote() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = firestore.collection("reviews")
+                .orderBy("timestamp")
+                .get()
+                .await()
+
+            val list = snapshot.documents.map { doc ->
+                val r = doc.toObject(Review::class.java)!!
+                ReviewEntity(
+                    id = doc.id,
+                    authorId = r.authorId,
+                    authorName = r.authorName,
+                    authorPhoto = r.authorPhoto,
+                    restaurant = r.restaurant,
+                    city = r.city,
+                    cuisine = r.cuisine,
+                    rating = r.rating,
+                    priceTier = r.priceTier,
+                    reviewText = r.reviewText,
+                    imageUrl = r.imageUrl ?: "",
+                    timestampMs = r.timestamp?.toDate()?.time ?: 0L
+                )
             }
+            dao.upsert(list)
+        }
     }
 }

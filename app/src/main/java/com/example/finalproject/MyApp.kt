@@ -9,12 +9,15 @@ class MyApp : Application() {
         lateinit var database: AppDatabase
             private set
     }
+
     override fun onCreate() {
         super.onCreate()
         database = Room.databaseBuilder(
-            this,
+            applicationContext,
             AppDatabase::class.java,
-            "my-db"
-        ).build()
+            "app_database"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 }
