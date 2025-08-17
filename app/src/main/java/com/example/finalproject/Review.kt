@@ -15,4 +15,5 @@ data class Review(
     val authorName: String = "",
     val authorPhoto: String = "",
     val timestamp: Timestamp? = null
+
 )

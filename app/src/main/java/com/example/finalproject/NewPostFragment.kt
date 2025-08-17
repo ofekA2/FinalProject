@@ -1,7 +1,9 @@
 package com.example.finalproject
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -29,14 +31,21 @@ class NewPostFragment : Fragment() {
     private var existingImageUrl: String? = null
 
     private val auth by lazy { FirebaseAuth.getInstance() }
-    private val db   by lazy { FirebaseFirestore.getInstance() }
+    private val db by lazy { FirebaseFirestore.getInstance() }
 
     private var pickedImageUri: Uri? = null
 
     private val pickImageLauncher =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             pickedImageUri = uri
-            if (uri != null) Toast.makeText(requireContext(), "Image selected", Toast.LENGTH_SHORT).show()
+            if (uri != null) {
+                requireContext().contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                binding.ivPostPreview.setImageURI(uri)
+                binding.ivPostPreview.visibility = View.VISIBLE
+                Toast.makeText(requireContext(), "Image selected", Toast.LENGTH_SHORT).show()
+            }
         }
 
     override fun onCreateView(
@@ -57,38 +66,45 @@ class NewPostFragment : Fragment() {
         }
 
         binding.btnPickPostImage.setOnClickListener {
-            pickImageLauncher.launch("image/*")
+            pickImageLauncher.launch(arrayOf("image/*"))
         }
 
         binding.btnSubmitPost.setOnClickListener {
             if (!validateFields()) return@setOnClickListener
 
-            val user       = auth.currentUser ?: return@setOnClickListener
+            val user = auth.currentUser ?: return@setOnClickListener
             val restaurant = binding.etRestaurant.text.toString().trim()
-            val city       = binding.etCity    .text.toString().trim()
-            val cuisine    = binding.etCuisine .text.toString().trim()
-            val rating     = binding.sliderRating.value.toDouble()
-            val priceTier  = binding.sliderPrice .value.toInt()
+            val city = binding.etCity.text.toString().trim()
+            val cuisine = binding.etCuisine .text.toString().trim()
+            val rating = binding.sliderRating.value.toDouble()
+            val priceTier = binding.sliderPrice.value.toInt()
             val reviewText = binding.etReviewText.text.toString().trim()
 
             binding.btnSubmitPost.isEnabled = false
 
             fun doUpdate(imageUrl: String?) {
                 val data = mapOf(
+                    "authorId" to user.uid,
+                    "authorName" to user.displayName,
+                    "authorPhoto" to user.photoUrl?.toString(),
                     "restaurant" to restaurant,
-                    "city"       to city,
-                    "cuisine"    to cuisine,
-                    "rating"     to rating,
-                    "priceTier"  to priceTier,
+                    "city" to city,
+                    "cuisine" to cuisine,
+                    "rating" to rating,
+                    "priceTier" to priceTier,
                     "reviewText" to reviewText,
-                    "imageUrl"   to (imageUrl ?: ""),
-                    "timestamp"  to Timestamp.now()
+                    "imageUrl" to (imageUrl ?: ""),
+                    "timestamp" to Timestamp.now()
                 )
-                db.collection("reviews")
-                    .document(editingId!!)
-                    .set(data, SetOptions.merge())
+                val docRef = if (isEditMode && editingId != null) {
+                    db.collection("reviews").document(editingId!!)
+                } else {
+                    db.collection("reviews").document()
+                }
+
+                docRef.set(data, SetOptions.merge())
                     .addOnSuccessListener {
-                        Toast.makeText(requireContext(), "Updated!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "Post updated!", Toast.LENGTH_SHORT).show()
                         findNavController().popBackStack()
                     }
                     .addOnFailureListener {
@@ -96,10 +112,14 @@ class NewPostFragment : Fragment() {
                         binding.btnSubmitPost.isEnabled = true
                     }
             }
-
             if (pickedImageUri != null) {
                 uploadImage(user.uid, pickedImageUri!!) { url ->
-                    doUpdate(url ?: existingImageUrl)
+                    if (url != null) {
+                        doUpdate(url)
+                    } else {
+                        Toast.makeText(requireContext(), "Image upload failed", Toast.LENGTH_SHORT).show()
+                        binding.btnSubmitPost.isEnabled = true
+                    }
                 }
             } else if (isEditMode) {
                 doUpdate(existingImageUrl)
@@ -116,7 +136,7 @@ class NewPostFragment : Fragment() {
                 val r = snap.toObject(Review::class.java) ?: return@addOnSuccessListener
                 existingImageUrl = r.imageUrl
                 binding.etRestaurant.setText(r.restaurant)
-                binding.etCity     .setText(r.city)
+                binding.etCity.setText(r.city)
                 binding.etCuisine  .setText(r.cuisine)
                 binding.sliderRating.value = r.rating.toFloat()
                 binding.sliderPrice .value = r.priceTier.toFloat()
@@ -162,12 +182,16 @@ class NewPostFragment : Fragment() {
             .reference.child("review_photos/${uid}_${UUID.randomUUID()}.jpg")
 
         ref.putFile(uri)
-            .continueWithTask { task ->
-                if (!task.isSuccessful) task.exception?.let { throw it }
-                ref.downloadUrl
+            .addOnSuccessListener {
+                ref.downloadUrl.addOnSuccessListener { url ->
+                    onDone(url.toString())
+                }.addOnFailureListener {
+                    Log.e("NewPost", "Download URL fetch failed", it)
+                    onDone(null)
+                }
             }
-            .addOnSuccessListener { onDone(it.toString()) }
             .addOnFailureListener {
+                Log.e("NewPost", "Image upload failed", it)
                 Toast.makeText(requireContext(), "Image upload failed", Toast.LENGTH_SHORT).show()
                 onDone(null)
             }

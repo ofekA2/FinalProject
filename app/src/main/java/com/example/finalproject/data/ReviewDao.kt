@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/finalproject/data/ReviewDao.kt
 package com.example.finalproject.data
 
 import androidx.room.Dao

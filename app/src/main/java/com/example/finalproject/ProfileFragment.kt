@@ -16,6 +16,7 @@ import androidx.lifecycle.asLiveData
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
+import com.example.finalproject.data.ReviewEntity
 import com.example.finalproject.databinding.FragmentProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
@@ -111,6 +112,11 @@ class ProfileFragment : Fragment() {
                 }
                 myPostsAdapter.setData(uiList)
             }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        syncMyPostsFromFirestore()
     }
 
     private fun showPopupMenu(anchor: View, review: Review) {
@@ -242,6 +248,45 @@ class ProfileFragment : Fragment() {
                     editDialogViews = null
                 }
         }
+    }
+
+    private fun syncMyPostsFromFirestore() {
+        db.collection("reviews")
+            .whereEqualTo("authorId", auth.currentUser?.uid)
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) {
+                    Toast.makeText(requireContext(), "Listen failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    return@addSnapshotListener
+                }
+
+                if (snapshots != null) {
+                    val reviewEntities = snapshots.documents.mapNotNull { doc ->
+                        val r = doc.toObject(Review::class.java)?.copy(id = doc.id)
+                        r?.let {
+                            it.timestamp?.toDate()?.let { it1 ->
+                                ReviewEntity(
+                                    id = it.id,
+                                    authorId = it.authorId,
+                                    authorName = it.authorName,
+                                    authorPhoto = it.authorPhoto,
+                                    restaurant = it.restaurant,
+                                    city = it.city,
+                                    cuisine = it.cuisine,
+                                    rating = it.rating,
+                                    priceTier = it.priceTier,
+                                    reviewText = it.reviewText,
+                                    imageUrl = it.imageUrl,
+                                    timestampMs = it1.time
+                                )
+                            }
+                        }
+                    }
+
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        MyApp.database.reviewDao().upsert(reviewEntities)
+                    }
+                }
+            }
     }
 
     override fun onDestroyView() {

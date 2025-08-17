@@ -91,6 +91,16 @@
             android:text="Pick photo"
             android:layout_marginTop="8dp"/>
 
+        <ImageView
+            android:id="@+id/ivPostPreview"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"
+            android:layout_marginTop="16dp"
+            android:contentDescription="Selected image preview"
+            android:visibility="gone"
+            />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSubmitPost"
             style="@style/Widget.Reviewaurant.Button"
