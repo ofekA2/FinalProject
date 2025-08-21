@@ -23,28 +23,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun refreshFromRemote() {
         viewModelScope.launch(Dispatchers.IO) {
-            val snapshot = firestore.collection("reviews")
-                .orderBy("timestamp")
-                .get()
-                .await()
+            val docs = firestore.collection("reviews").get().await()
 
-            val list = snapshot.documents.map { doc ->
-                val r = doc.toObject(Review::class.java)!!
-                ReviewEntity(
-                    id = doc.id,
-                    authorId = r.authorId,
-                    authorName = r.authorName,
-                    authorPhoto = r.authorPhoto,
-                    restaurant = r.restaurant,
-                    city = r.city,
-                    cuisine = r.cuisine,
-                    rating = r.rating,
-                    priceTier = r.priceTier,
-                    reviewText = r.reviewText,
-                    imageUrl = r.imageUrl ?: "",
-                    timestampMs = r.timestamp?.toDate()?.time ?: 0L
-                )
-            }
+            val list = docs.documents
+                .map { it.toSafeReview() }
+                .map { r ->
+                    ReviewEntity(
+                        id = r.id,
+                        authorId = r.authorId,
+                        authorName = r.authorName,
+                        authorPhoto = r.authorPhoto,
+                        restaurant = r.restaurant,
+                        city = r.city,
+                        cuisine = r.cuisine,
+                        rating = r.rating,
+                        priceTier = r.priceTier,
+                        reviewText = r.reviewText,
+                        imageUrl = r.imageUrl,
+                        timestampMs = r.timestamp?.toDate()?.time ?: 0L
+                    )
+                }
+
             dao.upsert(list)
         }
     }

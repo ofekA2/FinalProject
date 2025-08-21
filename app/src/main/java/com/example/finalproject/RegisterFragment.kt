@@ -6,14 +6,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.GetContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.navOptions
 import com.example.finalproject.databinding.FragmentRegisterBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.userProfileChangeRequest
-import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.util.Log
 
 class RegisterFragment : Fragment() {
 
@@ -22,13 +27,21 @@ class RegisterFragment : Fragment() {
 
     private var profilePhotoUri: Uri? = null
 
-    private val pickProfilePhoto =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            uri?.let {
-                profilePhotoUri = it
-                binding.ivProfilePreview.setImageURI(it)
-            }
+    private val pickProfilePhoto = registerForActivityResult(PickVisualMedia()) { uri: Uri? ->
+        if (uri != null) {
+            profilePhotoUri = uri
+            binding.ivProfilePreview.setImageURI(uri)
+        } else {
+            getContentFallback.launch("image/*")
         }
+    }
+
+    private val getContentFallback = registerForActivityResult(GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            profilePhotoUri = uri
+            binding.ivProfilePreview.setImageURI(uri)
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,12 +51,12 @@ class RegisterFragment : Fragment() {
         _binding = FragmentRegisterBinding.inflate(inflater, container, false)
 
         binding.btnPickProfilePhoto.setOnClickListener {
-            pickProfilePhoto.launch("image/*")
+            pickProfilePhoto.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
         }
 
         binding.btnRegister.setOnClickListener {
-            val name     = binding.etFullName.text.toString().trim()
-            val email    = binding.etRegEmail.text.toString().trim()
+            val name = binding.etFullName.text.toString().trim()
+            val email = binding.etRegEmail.text.toString().trim()
             val password = binding.etRegPassword.text.toString()
 
             if (name.isEmpty() || email.isEmpty() || password.length < 6) {
@@ -92,23 +105,16 @@ class RegisterFragment : Fragment() {
         uri: Uri,
         onComplete: (downloadUrl: String?) -> Unit
     ) {
-        val ref = FirebaseStorage.getInstance()
-            .reference
-            .child("profile_photos/$uid.jpg")
-
-        ref.putFile(uri)
-            .addOnSuccessListener {
-                ref.downloadUrl
-                    .addOnSuccessListener { downloadUri ->
-                        onComplete(downloadUri.toString())
-                    }
-                    .addOnFailureListener {
-                        onComplete(null)
-                    }
-            }
-            .addOnFailureListener {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val url = CloudinaryUploader.upload(requireContext(), uri)
+                onComplete(url)
+            } catch (e: Exception) {
+                Log.e("Register", "Avatar upload failed", e)
+                Toast.makeText(requireContext(), "Avatar upload failed: ${e.message}", Toast.LENGTH_LONG).show()
                 onComplete(null)
             }
+        }
     }
 
     private fun updateUserProfile(
@@ -117,20 +123,34 @@ class RegisterFragment : Fragment() {
     ) {
         val request = userProfileChangeRequest {
             displayName = name
-            photoUrl?.let { this.photoUri = Uri.parse(it) }
+            if (!photoUrl.isNullOrBlank()) {
+                photoUri = Uri.parse(photoUrl)
+            }
         }
 
-        FirebaseAuth.getInstance().currentUser!!
-            .updateProfile(request)
-            .addOnCompleteListener {
-                findNavController().navigate(
-                    R.id.restaurantListFragment,
-                    null,
-                    navOptions {
-                        popUpTo(R.id.nav_graph) { inclusive = true }
-                    }
-                )
-            }
+        val auth = FirebaseAuth.getInstance()
+        val user = auth.currentUser!!
+
+        user.updateProfile(request).addOnCompleteListener {
+            val finalPhoto = photoUrl ?: ""
+            val data = hashMapOf(
+                "uid" to user.uid,
+                "name" to name,
+                "email" to (user.email ?: ""),
+                "photoUrl" to finalPhoto
+            )
+
+            FirebaseFirestore.getInstance()
+                .collection("users").document(user.uid)
+                .set(data)
+                .addOnCompleteListener {
+                    findNavController().navigate(
+                        R.id.restaurantListFragment,
+                        null,
+                        navOptions { popUpTo(R.id.nav_graph) { inclusive = true } }
+                    )
+                }
+        }
     }
 
     override fun onDestroyView() {

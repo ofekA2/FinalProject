@@ -24,7 +24,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.userProfileChangeRequest
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -139,7 +138,8 @@ class ProfileFragment : Fragment() {
     }
 
     private fun confirmDelete(id: String, imageUrl: String?) {
-        MaterialAlertDialogBuilder(requireContext())
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Delete")
             .setMessage("Delete this review?")
             .setPositiveButton("Delete") { _, _ ->
                 db.collection("reviews").document(id)
@@ -148,13 +148,11 @@ class ProfileFragment : Fragment() {
                         lifecycleScope.launch(Dispatchers.IO) {
                             MyApp.database.reviewDao().deleteById(id)
                         }
-                         imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                            FirebaseStorage.getInstance().getReferenceFromUrl(url).delete()
-                        }
                         Toast.makeText(requireContext(), "Deleted", Toast.LENGTH_SHORT).show()
                     }
-                    .addOnFailureListener {
-                        Toast.makeText(requireContext(), it.message, Toast.LENGTH_SHORT).show()
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("Profile", "Delete failed", e)
+                        Toast.makeText(requireContext(), "Delete failed: ${e.message}", Toast.LENGTH_LONG).show()
                     }
             }
             .setNegativeButton("Cancel", null)
@@ -201,18 +199,17 @@ class ProfileFragment : Fragment() {
     }
 
     private fun uploadProfilePhoto(uid: String, uri: Uri, onDone: (String?) -> Unit) {
-        val ref = FirebaseStorage.getInstance().reference
-            .child("profile_photos/$uid.jpg")
-        ref.putFile(uri)
-            .continueWithTask { task ->
-                if (!task.isSuccessful) task.exception?.let { throw it }
-                ref.downloadUrl
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val url = CloudinaryUploader.upload(requireContext(), uri)
+                onDone(url)
             }
-            .addOnSuccessListener { onDone(it.toString()) }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Photo upload failed", Toast.LENGTH_SHORT).show()
+            catch (e: Exception) {
+                android.util.Log.e("Profile", "Cloudinary upload failed", e)
+                Toast.makeText(requireContext(), "Photo upload failed: ${e.message}", Toast.LENGTH_LONG).show()
                 onDone(null)
             }
+        }
     }
 
     private fun updateUserProfile(name: String, photoUrl: String?) {
@@ -260,26 +257,22 @@ class ProfileFragment : Fragment() {
                 }
 
                 if (snapshots != null) {
-                    val reviewEntities = snapshots.documents.mapNotNull { doc ->
-                        val r = doc.toObject(Review::class.java)?.copy(id = doc.id)
-                        r?.let {
-                            it.timestamp?.toDate()?.let { it1 ->
-                                ReviewEntity(
-                                    id = it.id,
-                                    authorId = it.authorId,
-                                    authorName = it.authorName,
-                                    authorPhoto = it.authorPhoto,
-                                    restaurant = it.restaurant,
-                                    city = it.city,
-                                    cuisine = it.cuisine,
-                                    rating = it.rating,
-                                    priceTier = it.priceTier,
-                                    reviewText = it.reviewText,
-                                    imageUrl = it.imageUrl,
-                                    timestampMs = it1.time
-                                )
-                            }
-                        }
+                    val reviewEntities = snapshots.documents.map { doc ->
+                        val r = doc.toSafeReview()
+                        ReviewEntity(
+                            id = r.id,
+                            authorId = r.authorId,
+                            authorName = r.authorName,
+                            authorPhoto = r.authorPhoto,
+                            restaurant = r.restaurant,
+                            city = r.city,
+                            cuisine = r.cuisine,
+                            rating = r.rating,
+                            priceTier = r.priceTier,
+                            reviewText = r.reviewText,
+                            imageUrl = r.imageUrl,
+                            timestampMs = r.timestamp?.toDate()?.time ?: 0L
+                        )
                     }
 
                     lifecycleScope.launch(Dispatchers.IO) {

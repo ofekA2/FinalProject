@@ -2,4 +2,6 @@
     <string name="app_name">FinalProject</string>
     <string name="login_cta">Already have an account? <u>Log In</u></string>
     <string name="register_cta">No account? <u>Register</u> </string>
+    <string name="cloudinary_cloud_name">dwfncvsgz</string>
+    <string name="cloudinary_unsigned_preset">unsigned_preset</string>
 </resources>

@@ -48,19 +48,19 @@ class SearchFragment : Fragment() {
     }
 
     private fun performSearch(query: String) {
-        val searchText = query.trim().lowercase()
+        val q = query.trim().lowercase()
+        val db = FirebaseFirestore.getInstance()
 
         db.collection("reviews")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { result ->
-                val filtered = result.documents.mapNotNull { doc ->
-                    val review = doc.toObject(Review::class.java)?.copy(id = doc.id)
-                    review?.takeIf {
-                        it.restaurant.lowercase().contains(searchText) ||
-                                it.city.lowercase().contains(searchText)
+                val filtered = result.documents
+                    .map { doc -> doc.toSafeReview() }
+                    .filter { r ->
+                        r.city.lowercase().contains(q) ||
+                                r.restaurant.lowercase().contains(q)
                     }
-                }
+
                 adapter.setData(filtered)
                 if (filtered.isEmpty()) {
                     Toast.makeText(requireContext(), "No matching results", Toast.LENGTH_SHORT).show()
