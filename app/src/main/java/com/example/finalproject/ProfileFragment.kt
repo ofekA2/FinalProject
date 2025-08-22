@@ -10,6 +10,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.asLiveData
@@ -24,8 +25,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.userProfileChangeRequest
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
 
 class ProfileFragment : Fragment() {
 
@@ -39,12 +43,33 @@ class ProfileFragment : Fragment() {
     private val db by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
-    private val pickImageLauncher = registerForActivityResult(
+    private var myPostsRegistration: ListenerRegistration? = null
+
+    private var useDefaultPhoto: Boolean = false
+    private var editAvatarPreview: ImageView? = null
+
+    private val pickProfilePhoto = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            useDefaultPhoto = false
+            newPhotoUri = uri
+            editAvatarPreview?.setImageURI(uri)
+        } else {
+            getContentFallbackProfile.launch("image/*")
+        }
+    }
+
+    private val getContentFallbackProfile = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        newPhotoUri = uri
-        uri?.let { editDialogViews?.ivPreview?.setImageURI(it) }
+        if (uri != null) {
+            useDefaultPhoto = false
+            newPhotoUri = uri
+            editAvatarPreview?.setImageURI(uri)
+        }
     }
+
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -66,12 +91,14 @@ class ProfileFragment : Fragment() {
         binding.btnEditProfile.setOnClickListener { showEditDialog() }
         binding.btnLogout.setOnClickListener {
             auth.signOut()
-            findNavController().navigate(
-                R.id.loginFragment, null,
-                androidx.navigation.navOptions {
-                    popUpTo(R.id.nav_graph) { inclusive = true }
-                }
-            )
+
+            val intent = android.content.Intent(requireContext(), MainActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            startActivity(intent)
+            requireActivity().finish()
         }
 
         myPostsAdapter = ReviewAdapter(emptyList())
@@ -161,10 +188,10 @@ class ProfileFragment : Fragment() {
 
 
     private fun showEditDialog() {
-        val v = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_edit_profile, null)
+        val v = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_profile, null)
         val ivPreview = v.findViewById<ImageView>(R.id.ivPreview)
         val btnPick = v.findViewById<Button>(R.id.btnPick)
+        val btnUseDef = v.findViewById<Button>(R.id.btnUseDefault)
         val etName = v.findViewById<TextInputEditText>(R.id.etName)
         val btnCancel = v.findViewById<Button>(R.id.btnCancel)
         val btnSave = v.findViewById<Button>(R.id.btnSave)
@@ -172,6 +199,11 @@ class ProfileFragment : Fragment() {
         val user = auth.currentUser!!
         etName.setText(user.displayName ?: "")
         user.photoUrl?.let { Glide.with(this).load(it).circleCrop().into(ivPreview) }
+            ?: ivPreview.setImageResource(R.drawable.ic_profile)
+
+        editAvatarPreview = ivPreview
+        useDefaultPhoto = false
+        newPhotoUri = null
 
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setView(v)
@@ -180,8 +212,20 @@ class ProfileFragment : Fragment() {
 
         editDialogViews = EditViews(ivPreview, etName, dialog)
 
-        btnPick.setOnClickListener { pickImageLauncher.launch("image/*") }
+        btnPick.setOnClickListener {
+            pickProfilePhoto.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
+        }
+
+        btnUseDef.setOnClickListener {
+            useDefaultPhoto = true
+            newPhotoUri = null
+            ivPreview.setImageResource(R.drawable.ic_profile)
+        }
+
         btnCancel.setOnClickListener { dialog.dismiss() }
+
         btnSave.setOnClickListener {
             val newName = etName.text?.toString()?.trim().orEmpty()
             if (newName.isBlank()) {
@@ -189,11 +233,25 @@ class ProfileFragment : Fragment() {
                 return@setOnClickListener
             }
             btnSave.isEnabled = false
-            val uri = newPhotoUri
-            if (uri != null) {
-                uploadProfilePhoto(user.uid, uri) { url -> updateUserProfile(newName, url) }
-            } else {
-                updateUserProfile(newName, null)
+            val uid = user.uid
+
+            when {
+                useDefaultPhoto -> {
+                    updateUserProfile(newName, photoUrl = "")
+                }
+                newPhotoUri != null -> {
+                    uploadProfilePhoto(uid, newPhotoUri!!) { url ->
+                        if (url == null) {
+                            Toast.makeText(requireContext(), "Photo upload failed", Toast.LENGTH_SHORT).show()
+                            btnSave.isEnabled = true
+                        } else {
+                            updateUserProfile(newName, photoUrl = url)
+                        }
+                    }
+                }
+                else -> {
+                    updateUserProfile(newName, photoUrl = null)
+                }
             }
         }
     }
@@ -214,45 +272,82 @@ class ProfileFragment : Fragment() {
 
     private fun updateUserProfile(name: String, photoUrl: String?) {
         val user = auth.currentUser ?: return
+
         val updates = userProfileChangeRequest {
             displayName = name
-            if (photoUrl != null) photoUri = Uri.parse(photoUrl)
+            when {
+                photoUrl == null -> {
+                }
+                photoUrl.isBlank() -> {
+                    photoUri = null
+                }
+                else -> {
+                    photoUri = Uri.parse(photoUrl)
+                }
+            }
         }
+
         user.updateProfile(updates).addOnCompleteListener { authTask ->
             if (!authTask.isSuccessful) {
                 Toast.makeText(requireContext(), "Auth update failed", Toast.LENGTH_SHORT).show()
                 editDialogViews?.dialog?.dismiss()
+                newPhotoUri = null
+                useDefaultPhoto = false
+                editAvatarPreview = null
+                editDialogViews = null
                 return@addOnCompleteListener
             }
+
+            val photoForDb = when {
+                photoUrl == null -> user.photoUrl?.toString() ?: ""
+                else -> photoUrl
+            }
+
             FirebaseFirestore.getInstance()
                 .collection("users")
                 .document(user.uid)
                 .set(
                     mapOf(
                         "fullName" to name,
-                        "photoUrl" to (photoUrl ?: user.photoUrl.toString())
+                        "photoUrl" to photoForDb
                     ),
                     SetOptions.merge()
                 )
                 .addOnCompleteListener {
                     binding.tvProfileName.text = name
-                    photoUrl?.let {
-                        Glide.with(this).load(it).circleCrop().into(binding.ivProfilePic)
+
+                    if (photoForDb.isNullOrBlank()) {
+                        binding.ivProfilePic.setImageResource(R.drawable.ic_profile)
+                    } else {
+                        Glide.with(this).load(photoForDb).circleCrop().into(binding.ivProfilePic)
                     }
+
                     Toast.makeText(requireContext(), "Profile updated", Toast.LENGTH_SHORT).show()
                     editDialogViews?.dialog?.dismiss()
+
                     newPhotoUri = null
+                    useDefaultPhoto = false
+                    editAvatarPreview = null
                     editDialogViews = null
                 }
         }
     }
 
     private fun syncMyPostsFromFirestore() {
-        db.collection("reviews")
-            .whereEqualTo("authorId", auth.currentUser?.uid)
+        myPostsRegistration?.remove()
+
+        val uid = auth.currentUser?.uid ?: return
+
+        myPostsRegistration = db.collection("reviews")
+            .whereEqualTo("authorId", uid)
             .addSnapshotListener { snapshots, error ->
                 if (error != null) {
-                    Toast.makeText(requireContext(), "Listen failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    val code = (error as? FirebaseFirestoreException)?.code
+                    if (isAdded && auth.currentUser != null &&
+                        code != FirebaseFirestoreException.Code.PERMISSION_DENIED
+                    ) {
+                        Toast.makeText(requireContext(), "Listen failed: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
                     return@addSnapshotListener
                 }
 
@@ -274,7 +369,6 @@ class ProfileFragment : Fragment() {
                             timestampMs = r.timestamp?.toDate()?.time ?: 0L
                         )
                     }
-
                     lifecycleScope.launch(Dispatchers.IO) {
                         MyApp.database.reviewDao().upsert(reviewEntities)
                     }
@@ -284,6 +378,8 @@ class ProfileFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        myPostsRegistration?.remove()
+        myPostsRegistration = null
         _binding = null
     }
 
