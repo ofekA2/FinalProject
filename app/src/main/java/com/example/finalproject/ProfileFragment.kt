@@ -10,7 +10,6 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.asLiveData
@@ -48,27 +47,25 @@ class ProfileFragment : Fragment() {
     private var useDefaultPhoto: Boolean = false
     private var editAvatarPreview: ImageView? = null
 
-    private val pickProfilePhoto = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
+
+
+    private val openDocProfile = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
         if (uri != null) {
+            try {
+                requireContext().contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) { }
+
             useDefaultPhoto = false
             newPhotoUri = uri
             editAvatarPreview?.setImageURI(uri)
-        } else {
-            getContentFallbackProfile.launch("image/*")
         }
     }
 
-    private val getContentFallbackProfile = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            useDefaultPhoto = false
-            newPhotoUri = uri
-            editAvatarPreview?.setImageURI(uri)
-        }
-    }
 
 
     override fun onCreateView(
@@ -213,9 +210,10 @@ class ProfileFragment : Fragment() {
         editDialogViews = EditViews(ivPreview, etName, dialog)
 
         btnPick.setOnClickListener {
-            pickProfilePhoto.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-            )
+            editAvatarPreview = ivPreview
+            useDefaultPhoto = false
+            newPhotoUri = null
+            openDocProfile.launch(arrayOf("image/*"))
         }
 
         btnUseDef.setOnClickListener {

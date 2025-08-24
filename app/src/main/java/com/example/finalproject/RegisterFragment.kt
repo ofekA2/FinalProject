@@ -6,9 +6,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts.GetContent
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.navOptions
@@ -27,17 +24,17 @@ class RegisterFragment : Fragment() {
 
     private var profilePhotoUri: Uri? = null
 
-    private val pickProfilePhoto = registerForActivityResult(PickVisualMedia()) { uri: Uri? ->
+    private val openDocRegister = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
         if (uri != null) {
-            profilePhotoUri = uri
-            binding.ivProfilePreview.setImageURI(uri)
-        } else {
-            getContentFallback.launch("image/*")
-        }
-    }
+            try {
+                requireContext().contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) { }
 
-    private val getContentFallback = registerForActivityResult(GetContent()) { uri: Uri? ->
-        if (uri != null) {
             profilePhotoUri = uri
             binding.ivProfilePreview.setImageURI(uri)
         }
@@ -51,7 +48,7 @@ class RegisterFragment : Fragment() {
         _binding = FragmentRegisterBinding.inflate(inflater, container, false)
 
         binding.btnPickProfilePhoto.setOnClickListener {
-            pickProfilePhoto.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
+            openDocRegister.launch(arrayOf("image/*"))
         }
 
         binding.btnRegister.setOnClickListener {
